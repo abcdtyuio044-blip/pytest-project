@@ -1,0 +1,74 @@
+# Explanation of the Project organized for a confluence page, Explanation for the project, the classes and main functions.
+
+The project is designed to provide a flexible and extensible test filtering pipeline for pytest. It allows users to define custom filtering logic for their test cases, making it easier to manage and execute tests based on various criteria.
+
+## Key Classes
+
+1. **PipelineStep**: This is an abstract base class that defines the interface for all filter stages in the pipeline. Each concrete step must implement the `apply` method to process a list of pytest.Item objects and return a filtered or transformed list.
+
+2. **TestFilterPipeline**: This is the main class that manages the sequence of filter stages. It allows users to add new stages and apply the entire pipeline to a list of tests. The pipeline can be configured with different stages to achieve the desired filtering behavior.
+
+3. **DateFilterStage**: This is a specific filter stage that filters tests based on their scheduled run days. Tests can be marked with `@pytest.mark.run_days(...)` to specify when they should run. The DateFilterStage checks the current day and only includes tests that are allowed to run on that day.
+
+4. **FixtureParameterGroups**: This is a data structure that holds grouped test results. It allows easy access to tests belonging to specific groups, making it easier to manage and execute tests based on their fixture parameters.
+
+## Main Functions
+
+- **add_stage(stage: PipelineStep)**: This method allows users to add a new filter stage to the pipeline. The stage will be applied in the order it was added.
+
+- **apply(tests: List[pytest.Item])**: This method applies all stages in the pipeline to the provided list of tests. It returns the filtered results after all stages have been applied.
+
+- **clear()**: This method removes all stages from the pipeline, allowing users to reset the pipeline state.
+
+## Usage Example
+
+Here's a simple example of how to use the test filtering pipeline:
+
+```python
+from pytest import Item
+
+# Create a list of test items
+tests = [Item(name="test1"), Item(name="test2"), Item(name="test3")]
+
+# Initialize the pipeline
+pipeline = TestFilterPipeline()
+
+# Add stages
+pipeline.add_stage(DateFilterStage())
+pipeline.add_stage(FixtureParameterGroupingStage())
+
+# Apply the pipeline to the test items
+filtered_tests = pipeline.apply(tests)
+
+
+# Explanation on test with parametrized tests and grouping them into "fast" and "slow" groups based on fixture parameters.
+# In your test files, you can define tests with fixture parameters and group them using markers.
+
+@pytest.mark.parametrize("sleep_time", [0.1, 1.0], ids=["quick", "slow"])
+def test_sleep(sleep_time):
+    time.sleep(sleep_time)
+    assert True
+
+# what happens in the pipeline grouping stage: (in words)
+
+In the pipeline grouping stage, the tests are analyzed based on their fixture parameters. 
+The `FixtureParameterGroupingStage` collects tests with similar fixture parameter values and groups them together. 
+This allows for more efficient test execution, as tests can be run in parallel or in specific batches based on their groupings.
+
+how xdist works with this:
+
+The `xdist` plugin for pytest can take advantage of the grouping done by the `FixtureParameterGroupingStage`. 
+When tests are grouped by their fixture parameters, `xdist` can distribute these groups across multiple worker processes. 
+This means that tests within the same group can be executed in parallel, leading to faster overall test execution times.
+
+By leveraging both the fixture parameter grouping and the `xdist` plugin, 
+you can achieve a highly efficient testing strategy that minimizes runtime while maximizing resource utilization.
+
+
+why divide into dates?
+
+Dividing tests into dates allows for better scheduling and resource management. By associating tests with specific run days, you can control when tests are executed based on their relevance or priority. This is particularly useful for long-running tests or tests that require specific environmental conditions.
+
+In the context of the `DateFilterStage`, tests can be marked with `@pytest.mark.run_days(...)` to indicate the days they are allowed to run. This information is then used to filter tests based on the current day, ensuring that only relevant tests are executed.
+
+By organizing tests in this way, you can achieve a more efficient testing process that aligns with your development and release cycles.
